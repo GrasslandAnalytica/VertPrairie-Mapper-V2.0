@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quebec Regional Farms Grassland Classification 2025</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 350px;
+            font-size: 14px;
+        }
+        
+        .info-panel h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 16px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+        
+        .legend-text {
+            flex: 1;
+            font-size: 13px;
+        }
+        
+        .stats-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        
+        .stats-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .stats-value {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .language-toggle {
+            position: absolute;
+            top: 10px;
+            right: 420px;
+            z-index: 2000;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            border: 2px solid #3498db;
+        }
+        
+        .language-toggle:hover {
+            background: #f0f0f0;
+        }
+        
+        .logo-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            cursor: pointer;
+        }
+        
+        .logo-container img {
+            height: 120px;
+            background: transparent;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        .logo-container img:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        
+        .calculation-result {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            max-width: 300px;
+        }
+        
+        .calculation-result h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .calc-item {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .leaflet-draw-actions {
+            z-index: 1001 !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="language-toggle" onclick="toggleLanguage()">
+        <span id="lang-btn">FR</span>
+    </div>
+    
+    <div class="info-panel">
+        <h3 id="panel-title">Grassland Classification</h3>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #FFD700;"></div>
+            <div class="legend-text">
+                <strong id="class1-name">Mechanically harvested (hay)</strong>
+            </div>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #32CD32;"></div>
+            <div class="legend-text">
+                <strong id="class2-name">Intensive grazing</strong>
+            </div>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #90EE90;"></div>
+            <div class="legend-text">
+                <strong id="class3-name">Extensive grazing</strong>
+            </div>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #DEB887;"></div>
+            <div class="legend-text">
+                <strong id="class4-name">Fallow / Uncultivated land</strong>
+            </div>
+        </div>
+        
+        <div class="stats-section">
+            <div class="stats-item">
+                <span class="stats-label" id="total-farms-label">Total Farms:</span>
+                <span class="stats-value">2,336</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label" id="total-area-label">Total Area:</span>
+                <span class="stats-value">10,326 ha</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label" id="class1-area-label">Mechanically harvested:</span>
+                <span class="stats-value">6,339 ha (61.4%)</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label" id="class2-area-label">Intensive grazing:</span>
+                <span class="stats-value">556 ha (5.4%)</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label" id="class3-area-label">Extensive grazing:</span>
+                <span class="stats-value">2,195 ha (21.3%)</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label" id="class4-area-label">Fallow / Uncultivated:</span>
+                <span class="stats-value">1,236 ha (12.0%)</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 11px; color: #666;">
+            <span id="draw-instruction">Use drawing tools to calculate area by class</span>
+        </div>
+    </div>
+    
+    <div class="calculation-result" id="calc-result">
+        <h4 id="calc-title">Calculation Result</h4>
+        <div id="calc-content"></div>
+    </div>
+    
+    <div class="logo-container">
+        <a href="https://www.grasslandanalytica.com" target="_blank">
+            <img src="logo.png" alt="Grassland Analytica">
+        </a>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Draw JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
+    <!-- Turf.js for spatial analysis -->
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    
+    <script>
+        // Language data
+        const translations = {
+            en: {
+                panelTitle: "Grassland Classification",
+                class1: "Mechanically harvested (hay)",
+                class2: "Intensive grazing",
+                class3: "Extensive grazing",
+                class4: "Fallow / Uncultivated land",
+                class1Short: "Mechanically harvested:",
+                class2Short: "Intensive grazing:",
+                class3Short: "Extensive grazing:",
+                class4Short: "Fallow / Uncultivated:",
+                totalFarms: "Total Farms:",
+                totalArea: "Total Area:",
+                drawInstruction: "Use drawing tools to calculate area by class",
+                calcTitle: "Calculation Result",
+                drawnArea: "Drawn Area",
+                class: "Class"
+            },
+            fr: {
+                panelTitle: "Cartographe de la gestion des prairies",
+                class1: "Prairies récoltées mécaniquement (foin)",
+                class2: "Pâturage intensif",
+                class3: "Pâturage extensif",
+                class4: "Friches",
+                class1Short: "Prairies récoltées mécaniquement:",
+                class2Short: "Pâturage intensif:",
+                class3Short: "Pâturage extensif:",
+                class4Short: "Friches:",
+                totalFarms: "Total des Fermes:",
+                totalArea: "Superficie Totale:",
+                drawInstruction: "Utilisez l'outil polygone à gauche pour dessiner une zone et calculer les statistiques.",
+                calcTitle: "Statistiques de la Zone Sélectionnée",
+                drawnArea: "Zone Dessinée",
+                class: "Classe"
+            }
+        };
+        
+        let currentLang = 'en';
+        
+        function toggleLanguage() {
+            currentLang = currentLang === 'en' ? 'fr' : 'en';
+            updateLanguage();
+            document.getElementById('lang-btn').textContent = currentLang === 'en' ? 'FR' : 'EN';
+        }
+        
+        function updateLanguage() {
+            const t = translations[currentLang];
+            document.getElementById('panel-title').textContent = t.panelTitle;
+            document.getElementById('class1-name').textContent = t.class1;
+            document.getElementById('class2-name').textContent = t.class2;
+            document.getElementById('class3-name').textContent = t.class3;
+            document.getElementById('class4-name').textContent = t.class4;
+            document.getElementById('class1-area-label').textContent = t.class1Short;
+            document.getElementById('class2-area-label').textContent = t.class2Short;
+            document.getElementById('class3-area-label').textContent = t.class3Short;
+            document.getElementById('class4-area-label').textContent = t.class4Short;
+            document.getElementById('total-farms-label').textContent = t.totalFarms;
+            document.getElementById('total-area-label').textContent = t.totalArea;
+            document.getElementById('draw-instruction').textContent = t.drawInstruction;
+            document.getElementById('calc-title').textContent = t.calcTitle;
+        }
+        
+        // Initialize map centered on Quebec farms region
+        const map = L.map('map').setView([45.87, -72.47], 11);
+        
+        // Add satellite base map with labels
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 19
+        }).addTo(map);
+        
+        L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}.png', {
+            attribution: 'Map tiles by Stamen Design',
+            maxZoom: 19,
+            opacity: 0.5,
+            pane: 'overlayPane'
+        }).addTo(map);
+        
+        // Classification colors
+        const classColors = {
+            1: '#FFD700',  // Gold - Mechanically harvested
+            2: '#32CD32',  // Lime - Intensive grazing
+            3: '#90EE90',  // Light green - Extensive grazing
+            4: '#DEB887'   // Tan - Fallow
+        };
+        
+        let classificationLayer;
+        let classificationData;
+        
+        // Load classification data
+        console.log('Loading classification data...');
+        fetch('classification.geojson')
+            .then(response => {
+                console.log('Classification response received:', response.status);
+                if (!response.ok) {
+                    throw new Error('Failed to load classification.geojson');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Classification data loaded:', data.features.length, 'features');
+                classificationData = data;
+                
+                classificationLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        return {
+                            fillColor: classColors[feature.properties.DN],
+                            weight: 0.5,
+                            opacity: 1,
+                            color: '#666',
+                            fillOpacity: 0.7
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const className = translations[currentLang]['class' + feature.properties.DN];
+                        layer.bindPopup(`<strong>${translations[currentLang].class} ${feature.properties.DN}</strong><br>${className}`);
+                    }
+                }).addTo(map);
+                
+                console.log('Classification layer added to map');
+                classificationLayer.setZIndex(650);
+            })
+            .catch(error => {
+                console.error('Error loading classification:', error);
+                alert('Error loading classification data: ' + error.message);
+            });
+        
+        // Load AOI boundary
+        console.log('Loading AOI boundary...');
+        fetch('AOI.geojson')
+            .then(response => {
+                console.log('AOI response received:', response.status);
+                if (!response.ok) {
+                    throw new Error('Failed to load AOI.geojson');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('AOI data loaded:', data.features.length, 'features');
+                const aoiLayer = L.geoJSON(data, {
+                    style: {
+                        fillColor: 'transparent',
+                        weight: 3,
+                        opacity: 1,
+                        color: '#FF0000',
+                        fillOpacity: 0
+                    }
+                }).addTo(map);
+                
+                console.log('AOI layer added to map');
+                aoiLayer.setZIndex(700);
+                
+                // Fit map to AOI bounds
+                map.fitBounds(aoiLayer.getBounds());
+            })
+            .catch(error => {
+                console.error('Error loading AOI:', error);
+                alert('Error loading AOI boundary: ' + error.message);
+            });
+        
+        // Add drawing tools
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        
+        const drawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+                polyline: false,
+                circle: false,
+                circlemarker: false,
+                marker: false,
+                polygon: {
+                    allowIntersection: false,
+                    showArea: true,
+                    metric: ['ha', 'km']
+                },
+                rectangle: {
+                    showArea: true,
+                    metric: ['ha', 'km']
+                }
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+        
+        // Handle drawing
+        map.on(L.Draw.Event.CREATED, function(event) {
+            const layer = event.layer;
+            drawnItems.addLayer(layer);
+            
+            // Calculate areas by class
+            calculateAreaByClass(layer.toGeoJSON());
+        });
+        
+        map.on(L.Draw.Event.EDITED, function(event) {
+            const layers = event.layers;
+            layers.eachLayer(function(layer) {
+                calculateAreaByClass(layer.toGeoJSON());
+            });
+        });
+        
+        map.on(L.Draw.Event.DELETED, function(event) {
+            document.getElementById('calc-result').style.display = 'none';
+        });
+        
+        function calculateAreaByClass(drawnShape) {
+            if (!classificationData) return;
+            
+            const t = translations[currentLang];
+            const drawnPoly = turf.polygon(drawnShape.geometry.coordinates);
+            const totalDrawnArea = turf.area(drawnPoly) / 10000; // Convert to hectares
+            
+            const classSummary = {1: 0, 2: 0, 3: 0, 4: 0};
+            
+            classificationData.features.forEach(feature => {
+                try {
+                    const classPolys = feature.geometry.type === 'MultiPolygon' 
+                        ? feature.geometry.coordinates.map(coords => turf.polygon(coords))
+                        : [turf.polygon(feature.geometry.coordinates)];
+                    
+                    classPolys.forEach(classPoly => {
+                        try {
+                            const intersection = turf.intersect(drawnPoly, classPoly);
+                            if (intersection) {
+                                const intersectionArea = turf.area(intersection) / 10000; // hectares
+                                classSummary[feature.properties.DN] += intersectionArea;
+                            }
+                        } catch (e) {
+                            // Skip geometries that cause intersection errors
+                        }
+                    });
+                } catch (e) {
+                    // Skip invalid geometries
+                }
+            });
+            
+            // Display results
+            let resultHTML = `<div class="calc-item"><strong>${t.drawnArea}:</strong> ${totalDrawnArea.toFixed(2)} ha</div><br>`;
+            
+            for (let classNum = 1; classNum <= 4; classNum++) {
+                const area = classSummary[classNum];
+                const percentage = totalDrawnArea > 0 ? (area / totalDrawnArea * 100).toFixed(1) : 0;
+                const className = translations[currentLang]['class' + classNum];
+                resultHTML += `<div class="calc-item">
+                    <strong>${t.class} ${classNum}:</strong> ${area.toFixed(2)} ha (${percentage}%)
+                    <br><span style="font-size: 11px; color: #666;">${className}</span>
+                </div>`;
+            }
+            
+            document.getElementById('calc-content').innerHTML = resultHTML;
+            document.getElementById('calc-result').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
