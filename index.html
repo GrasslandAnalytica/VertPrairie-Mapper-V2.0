@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grassland Classification Map / Carte de Classification des Prairies</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        
+        .info-panel h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+        
+        .language-toggle {
+            position: absolute;
+            top: 20px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        .language-toggle:hover {
+            background: #f0f0f0;
+        }
+        
+        .legend {
+            margin: 20px 0;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .legend-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+        
+        .legend-label {
+            flex-grow: 1;
+            font-size: 13px;
+        }
+        
+        .statistics, .drawn-area-stats {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .total-area {
+            background: #3498db !important;
+            color: white !important;
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 12px !important;
+        }
+        
+        .total-area .stat-label,
+        .total-area .stat-value {
+            color: white;
+        }
+        
+        .class-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .instruction {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .drawn-area-stats {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .drawn-area-stats h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        
+        .logo-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        
+        .logo-container .logo-text {
+            color: white;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 3px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        
+        .logo-container img {
+            height: 80px;
+            width: auto;
+            display: block;
+            filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.7));
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="language-toggle" onclick="toggleLanguage()">
+        <span id="lang-button">FR</span>
+    </div>
+    
+    <div class="logo-container">
+        <div class="logo-text">Supported by:</div>
+        <a href="https://www.grasslandanalytica.com/" target="_blank" rel="noopener noreferrer">
+            <img src="logo.png" alt="GrasslandAnalytica Logo" style="cursor: pointer;">
+        </a>
+    </div>
+    
+    <div class="info-panel">
+        <h2 id="panel-title">Grassland Classification</h2>
+        
+        <div class="instruction">
+            <strong id="instruction-title">📍 Draw Tool</strong><br>
+            <span id="instruction-text">Use the polygon tool on the left to draw an area and calculate statistics within it.</span>
+        </div>
+        
+        <div class="legend">
+            <h3 id="legend-title" style="font-size: 15px; margin-bottom: 10px; color: #555;">Legend</h3>
+            <div id="legend-content"></div>
+            <div class="legend-item" style="margin-top: 10px;">
+                <div class="legend-color" style="background-color: transparent; border: 3px solid red;"></div>
+                <div class="legend-label">
+                    <div class="class-name" id="aoi-label">Study Area (AOI)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="statistics">
+            <h3 id="stats-title" style="font-size: 15px; margin-bottom: 10px; color: #555;">Total Area Statistics</h3>
+            <div id="stats-content"></div>
+        </div>
+        
+        <div id="drawn-stats" class="drawn-area-stats" style="display: none;">
+            <h3 id="drawn-title">Selected Area Statistics</h3>
+            <div id="drawn-stats-content"></div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Draw JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Turf.js for spatial analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    
+    <script>
+        // Global variables
+        let classificationLayer = null;
+        let classificationData = null;
+        let aoiLayer = null;
+        
+        // Translations
+        const translations = {
+            en: {
+                title: "Grassland Classification",
+                legend: "Legend",
+                stats: "Total Area Statistics",
+                drawnStats: "Selected Area Statistics",
+                totalArea: "Total Area",
+                aoi: "Study Area (AOI)",
+                instructionTitle: "📍 Draw Tool",
+                instructionText: "Use the polygon tool on the left to draw an area and calculate statistics within it.",
+                classes: {
+                    1: "Mechanically harvested (hay)",
+                    2: "Intensive grazing",
+                    3: "Extensive grazing",
+                    4: "Fallow / Uncultivated land"
+                }
+            },
+            fr: {
+                title: "Classification des Prairies",
+                legend: "Légende",
+                stats: "Statistiques de Surface Totale",
+                drawnStats: "Statistiques de la Zone Sélectionnée",
+                totalArea: "Surface Totale",
+                aoi: "Zone d'Étude (AOI)",
+                instructionTitle: "📍 Outil de Dessin",
+                instructionText: "Utilisez l'outil polygone à gauche pour dessiner une zone et calculer les statistiques.",
+                classes: {
+                    1: "Prairies récoltées mécaniquement (foin)",
+                    2: "Pâturage intensif",
+                    3: "Pâturage extensif",
+                    4: "Friches"
+                }
+            }
+        };
+        
+        let currentLang = 'en';
+        
+        // Class color mapping
+        const classColors = {
+            1: '#FFD700',  // Gold
+            2: '#32CD32',  // Lime green
+            3: '#90EE90',  // Light green
+            4: '#DEB887'   // Burlywood
+        };
+        
+        // Total statistics
+        const totalStats = {
+            classes: [
+                { code: 1, area_ha: 572.75, pixel_count: 229100 },
+                { code: 2, area_ha: 43.81, pixel_count: 17525 },
+                { code: 3, area_ha: 161.65, pixel_count: 64660 },
+                { code: 4, area_ha: 160.37, pixel_count: 64148 }
+            ],
+            total_area_ha: 938.58
+        };
+        
+        // Initialize map
+        const map = L.map('map').setView([45.9627, -72.4215], 14);
+        
+        // Add base maps
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 19
+        });
+        
+        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            maxZoom: 19,
+            zIndex: 1000
+        });
+        
+        // Create satellite with labels layer group
+        const satelliteWithLabels = L.layerGroup([satelliteLayer, labelsLayer]).addTo(map);
+        
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        });
+        
+        const baseMaps = {
+            "Satellite (with labels)": satelliteWithLabels,
+            "OpenStreetMap": osmLayer,
+            "Terrain": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: 'Map data: &copy; OpenTopoMap',
+                maxZoom: 17
+            })
+        };
+        
+        L.control.layers(baseMaps).addTo(map);
+        
+        // Add drawing controls
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        
+        const drawControl = new L.Control.Draw({
+            draw: {
+                polygon: {
+                    shapeOptions: {
+                        color: '#3388ff',
+                        fillOpacity: 0.2
+                    }
+                },
+                polyline: false,
+                rectangle: true,
+                circle: false,
+                marker: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+        
+        // Handle drawn polygons
+        map.on(L.Draw.Event.CREATED, function (event) {
+            const layer = event.layer;
+            drawnItems.clearLayers();
+            drawnItems.addLayer(layer);
+            
+            calculateStatsInPolygon(layer);
+        });
+        
+        map.on(L.Draw.Event.DELETED, function () {
+            document.getElementById('drawn-stats').style.display = 'none';
+        });
+        
+        // Load classification data
+        async function loadClassification() {
+            console.log('Loading classification data...');
+            try {
+                const timestamp = new Date().getTime();
+                const response = await fetch(`classification.geojson?t=${timestamp}`);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                classificationData = await response.json();
+                console.log('Loaded', classificationData.features.length, 'classification features');
+                
+                // Create a custom pane for classification with higher z-index
+                if (!map.getPane('classificationPane')) {
+                    map.createPane('classificationPane');
+                    map.getPane('classificationPane').style.zIndex = 650;
+                    map.getPane('classificationPane').style.pointerEvents = 'auto';
+                }
+                
+                classificationLayer = L.geoJSON(classificationData, {
+                    pane: 'classificationPane',
+                    style: function(feature) {
+                        const classValue = feature.properties.DN;
+                        return {
+                            fillColor: classColors[classValue] || '#888888',
+                            weight: 0.5,
+                            opacity: 0.8,
+                            color: '#fff',
+                            fillOpacity: 0.85
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const classCode = feature.properties.DN;
+                        const className = translations[currentLang].classes[classCode];
+                        layer.bindPopup(`<strong>${className}</strong><br>Class Code: ${classCode}`);
+                    }
+                }).addTo(map);
+                
+                console.log('Classification layer added to map');
+                // Don't zoom to classification bounds - let AOI handle it
+                
+            } catch (error) {
+                console.error('Error loading classification:', error);
+                alert('Error loading classification data. Make sure you are running the server with start_server.py');
+            }
+        }
+        
+        // Load AOI boundary
+        async function loadAOI() {
+            console.log('Loading AOI boundary...');
+            try {
+                const response = await fetch('AOI.geojson');
+                console.log('AOI response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const aoiData = await response.json();
+                console.log('Loaded AOI with', aoiData.features.length, 'features');
+                
+                // Create AOI pane with high z-index to appear on top
+                if (!map.getPane('aoiPane')) {
+                    map.createPane('aoiPane');
+                    map.getPane('aoiPane').style.zIndex = 700;
+                }
+                
+                aoiLayer = L.geoJSON(aoiData, {
+                    pane: 'aoiPane',
+                    style: {
+                        fillColor: 'transparent',
+                        weight: 4,
+                        opacity: 1,
+                        color: 'red',
+                        fillOpacity: 0
+                    }
+                }).addTo(map);
+                
+                console.log('AOI layer added to map');
+                
+                // Zoom to AOI bounds
+                map.fitBounds(aoiLayer.getBounds(), {
+                    padding: [50, 50]
+                });
+                
+            } catch (error) {
+                console.error('Error loading AOI:', error);
+                alert('Error loading AOI boundary. Make sure AOI.geojson exists and server is running.');
+            }
+        }
+        
+        // Calculate statistics within drawn polygon
+        function calculateStatsInPolygon(drawnLayer) {
+            const drawnPolygon = drawnLayer.toGeoJSON();
+            const stats = { 1: 0, 2: 0, 3: 0, 4: 0 };
+            let processedCount = 0;
+            
+            // Convert drawn polygon to turf polygon
+            const searchPolygon = turf.polygon(drawnPolygon.geometry.coordinates);
+            
+            classificationLayer.eachLayer(function(layer) {
+                const feature = layer.feature;
+                const classCode = feature.properties.DN;
+                
+                try {
+                    // Check if feature is within or intersects the drawn polygon
+                    let featureGeom;
+                    
+                    if (feature.geometry.type === 'Polygon') {
+                        featureGeom = turf.polygon(feature.geometry.coordinates);
+                    } else if (feature.geometry.type === 'MultiPolygon') {
+                        featureGeom = turf.multiPolygon(feature.geometry.coordinates);
+                    } else {
+                        return; // Skip if not a polygon
+                    }
+                    
+                    // Check if it intersects
+                    const intersection = turf.intersect(featureGeom, searchPolygon);
+                    
+                    if (intersection) {
+                        const area = turf.area(intersection); // in m²
+                        const areaHa = area / 10000;
+                        stats[classCode] += areaHa;
+                        processedCount++;
+                    }
+                } catch (e) {
+                    console.warn('Error processing feature:', e);
+                }
+            });
+            
+            console.log(`Processed ${processedCount} features within polygon`);
+            displayDrawnStats(stats);
+        }
+        
+        // Display statistics for drawn area
+        function displayDrawnStats(stats) {
+            const t = translations[currentLang];
+            let html = '';
+            let total = 0;
+            
+            for (let i = 1; i <= 4; i++) {
+                if (stats[i] > 0) {
+                    const className = t.classes[i];
+                    const area = stats[i].toFixed(2);
+                    total += parseFloat(area);
+                    
+                    html += `
+                        <div class="stat-item">
+                            <div class="stat-label">${className}</div>
+                            <div class="stat-value">${parseFloat(area).toLocaleString()} ha</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            html += `
+                <div class="stat-item total-area">
+                    <div class="stat-label">${t.totalArea}</div>
+                    <div class="stat-value">${total.toFixed(2)} ha</div>
+                </div>
+            `;
+            
+            document.getElementById('drawn-stats-content').innerHTML = html;
+            document.getElementById('drawn-stats').style.display = 'block';
+        }
+        
+        // Toggle language
+        function toggleLanguage() {
+            currentLang = currentLang === 'en' ? 'fr' : 'en';
+            document.getElementById('lang-button').textContent = currentLang === 'en' ? 'FR' : 'EN';
+            updateDisplay();
+        }
+        
+        // Update display
+        function updateDisplay() {
+            const t = translations[currentLang];
+            
+            document.getElementById('panel-title').textContent = t.title;
+            document.getElementById('legend-title').textContent = t.legend;
+            document.getElementById('stats-title').textContent = t.stats;
+            document.getElementById('drawn-title').textContent = t.drawnStats;
+            document.getElementById('aoi-label').textContent = t.aoi;
+            document.getElementById('instruction-title').textContent = t.instructionTitle;
+            document.getElementById('instruction-text').textContent = t.instructionText;
+            
+            // Update legend
+            let legendHTML = '';
+            for (let i = 1; i <= 4; i++) {
+                legendHTML += `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: ${classColors[i]}"></div>
+                        <div class="legend-label">
+                            <div class="class-name">${t.classes[i]}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('legend-content').innerHTML = legendHTML;
+            
+            // Update total statistics
+            let statsHTML = '';
+            totalStats.classes.forEach(classInfo => {
+                const className = t.classes[classInfo.code];
+                statsHTML += `
+                    <div class="stat-item">
+                        <div class="stat-label">${className}</div>
+                        <div class="stat-value">${classInfo.area_ha.toLocaleString()} ha</div>
+                    </div>
+                `;
+            });
+            
+            statsHTML += `
+                <div class="stat-item total-area">
+                    <div class="stat-label">${t.totalArea}</div>
+                    <div class="stat-value">${totalStats.total_area_ha.toLocaleString()} ha</div>
+                </div>
+            `;
+            
+            document.getElementById('stats-content').innerHTML = statsHTML;
+        }
+        
+        // Initialize - load classification first, then AOI
+        async function initialize() {
+            await loadClassification();
+            await loadAOI();
+            updateDisplay();
+        }
+        
+        initialize();
+    </script>
+</body>
+</html>
